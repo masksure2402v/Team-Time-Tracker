@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { useTime } from '../context/TimeContext';
 import { getWeeklySummary, getMonthlySummary, getLeaveCount } from '../utils/analytics';
-import { Trash2, Clock, Calendar, AlertCircle, X } from 'lucide-react';
+import { Trash2, Clock, Calendar, AlertCircle, X, Edit2, Check } from 'lucide-react';
 import CalendarView from './CalendarView';
 import { format, isSameDay, parseISO } from 'date-fns';
+import { calculateDuration } from '../utils/analytics';
 
 const Dashboard = () => {
-  const { entries, deleteEntry, activeUser } = useTime();
+  const { entries, deleteEntry, updateEntry, activeUser } = useTime();
   const [selectedDate, setSelectedDate] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
 
   const weeklyHours = getWeeklySummary(entries).toFixed(1);
   const monthlyHours = getMonthlySummary(entries).toFixed(1);
@@ -19,6 +24,26 @@ const Dashboard = () => {
 
   const closeModal = () => {
     setSelectedDate(null);
+    setEditingId(null);
+  };
+
+  const startEditing = (entry) => {
+    setEditingId(entry.id);
+    setEditValue(entry.description);
+    setEditStartTime(entry.startTime || '');
+    setEditEndTime(entry.endTime || '');
+  };
+
+  const saveEdit = (id, type) => {
+    const updates = { description: editValue };
+    if (type === 'work') {
+        const duration = calculateDuration(editStartTime, editEndTime);
+        updates.startTime = editStartTime;
+        updates.endTime = editEndTime;
+        updates.duration = duration;
+    }
+    updateEntry(id, updates);
+    setEditingId(null);
   };
 
   const selectedDateEntries = selectedDate 
@@ -69,20 +94,48 @@ const Dashboard = () => {
                             {selectedDateEntries.map((entry) => (
                                 <div key={entry.id} className={`day-entry ${entry.type}`}>
                                     <div className="entry-header">
-                                        <span className={`badge ${entry.type}`}>{entry.type === 'work' ? 'WORK' : 'LEAVE'}</span>
-                                        {entry.type === 'work' && <span className="entry-time">{entry.startTime} - {entry.endTime} ({entry.duration.toFixed(1)}h)</span>}
-                                        <button onClick={() => deleteEntry(entry.id)} className="btn-icon delete-btn"><Trash2 size={16} /></button>
+                                        <div className="header-left">
+                                            <span className={`badge ${entry.type}`}>{entry.type === 'work' ? 'WORK' : 'LEAVE'}</span>
+                                            {editingId === entry.id ? (
+                                                entry.type === 'work' && (
+                                                    <div className="edit-times">
+                                                        <input type="time" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} className="time-input-inline" />
+                                                        <span>-</span>
+                                                        <input type="time" value={editEndTime} onChange={e => setEditEndTime(e.target.value)} className="time-input-inline" />
+                                                    </div>
+                                                )
+                                            ) : (
+                                                entry.type === 'work' && <span className="entry-time">{entry.startTime} - {entry.endTime} ({entry.duration.toFixed(1)}h)</span>
+                                            )}
+                                        </div>
+                                        <div className="header-actions">
+                                            {editingId === entry.id ? (
+                                                <button onClick={() => saveEdit(entry.id, entry.type)} className="btn-icon save-btn"><Check size={16} /></button>
+                                            ) : (
+                                                <button onClick={() => startEditing(entry)} className="btn-icon edit-btn"><Edit2 size={16} /></button>
+                                            )}
+                                            <button onClick={() => deleteEntry(entry.id)} className="btn-icon delete-btn"><Trash2 size={16} /></button>
+                                        </div>
                                     </div>
                                     
                                     <div className="entry-tasks">
-                                        {entry.type === 'work' ? (
-                                            <ul className="task-list">
-                                                {entry.description.split(',').map((task, idx) => (
-                                                    <li key={idx} className="task-item">{task.trim()}</li>
-                                                ))}
-                                            </ul>
+                                        {editingId === entry.id ? (
+                                            <textarea 
+                                                value={editValue} 
+                                                onChange={e => setEditValue(e.target.value)} 
+                                                className="edit-textarea" 
+                                                autoFocus
+                                            />
                                         ) : (
-                                            <p className="leave-reason">{entry.description}</p>
+                                            entry.type === 'work' ? (
+                                                <ul className="task-list">
+                                                    {entry.description.split(',').map((task, idx) => (
+                                                        <li key={idx} className="task-item">{task.trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="leave-reason">{entry.description}</p>
+                                            )
                                         )}
                                     </div>
                                 </div>

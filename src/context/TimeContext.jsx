@@ -45,19 +45,26 @@ export const TimeProvider = ({ children }) => {
     setActiveUserId(id);
   };
 
-  const addEntry = (entry) => {
-    const newEntry = {
+  const addEntry = (entry, userIds = null) => {
+    const targets = userIds || [activeUserId];
+    const newEntries = targets.map(uid => ({
       id: uuidv4(),
-      userId: activeUserId,
+      userId: uid,
       createdAt: new Date().toISOString(),
       type: entry.type || 'work', // 'work' or 'leave'
       ...entry,
-    };
-    setEntries((prev) => [newEntry, ...prev]);
+    }));
+    setEntries((prev) => [...newEntries, ...prev]);
   };
 
   const deleteEntry = (id) => {
     setEntries((prev) => prev.filter((entry) => entry.id !== id));
+  };
+
+  const updateEntry = (id, updatedFields) => {
+    setEntries((prev) => prev.map((entry) => 
+      entry.id === id ? { ...entry, ...updatedFields } : entry
+    ));
   };
 
   // Filter entries for the active user
@@ -70,6 +77,7 @@ export const TimeProvider = ({ children }) => {
       allEntries: entries,
       addEntry, 
       deleteEntry,
+      updateEntry,
       users,
       activeUser,
       addUser,
